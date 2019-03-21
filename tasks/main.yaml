@@ -1,0 +1,93 @@
+---
+
+- name: default to install stuff
+  set_fact:
+    ghrr_install: true
+
+- name: validate repository and version storage info
+  block:
+    - name: github repository variable set
+      fail:
+        msg: you need to set github_repository
+      when: github_repository == ''
+    - name: where to save version info
+      fail:
+        msg: you need to set storage_version_path
+      when: storage_version_path == ''
+    - name: how to name version info
+      fail:
+        msg: you need to set storage_version_filename
+      when: storage_version_filename == ''
+
+- name: get latest version
+  shell: curl --silent "https://api.github.com/repos/{{ github_repository }}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/'
+  changed_when: false
+  register: latestv
+
+- name: ensure storage_version_path
+  file:
+    path: "{{ storage_version_path }}"
+    state: directory
+
+- name: set version variable
+  set_fact:
+    github_repository_version: "{{ latestv.stdout }}"
+  when: ghrr_install
+
+- name: set version variable if starting with 'v'
+  set_fact:
+    github_repository_version: "{{ latestv.stdout[1:] }}"
+  when: ghrr_install and latestv.stdout | regex_search('^v')
+
+- name: version compare
+  block:
+    - name: check if version info exists
+      stat:
+        path: "{{ storage_version_path }}/{{ storage_version_filename }}"
+      register: sv
+    - name: save file name
+      set_fact:
+        ghrr_version_file_name: "{{ storage_version_path }}/{{ storage_version_filename }}"
+      when: sv.stat.exists
+    - name: read file content
+      set_fact:
+        svcontent: "{{ lookup('file', ghrr_version_file_name) }}"
+      when: sv.stat.exists
+    - name: do not install
+      set_fact:
+        ghrr_install: false
+      when: sv.stat.exists and svcontent == github_repository_version
+
+- name: validate required variables
+  block:
+    - name: github release url
+      fail:
+        msg: you need to set github_download_url
+      when: github_download_url == ''
+    - name: path to save release
+      fail:
+        msg: you need to set save_path
+      when: save_path == ''
+  when: ghrr_install
+
+- name: download release
+  get_url:
+    url: "{{ github_download_url }}"
+    dest: "{{ save_path }}"
+    mode: 0400
+  when: ghrr_install and unpack == false
+
+- name: download and unpack release
+  unarchive:
+    src: "{{ github_download_url }}"
+    dest: "{{ save_path }}"
+    remote_src: true
+  when: ghrr_install and unpack == true
+
+- name: save version
+  copy:
+    content: "{{ github_repository_version }}"
+    dest: "{{ storage_version_path }}/{{ storage_version_filename }}"
+    mode: 0400
+  when: ghrr_install
+  
