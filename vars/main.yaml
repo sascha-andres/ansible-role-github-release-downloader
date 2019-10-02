@@ -3,7 +3,6 @@
 github_repository: ''
 github_download_url: '' # something like https://github.com/{{ github_repository }}/releases/download/{{ latestv.stdout }}/blink1-tool-{{ blinkv.stdout }}-linux-x86_64.zip
 
-storage_save_path: ''
 storage_version_path: ''
 storage_version_filename: ''
 
