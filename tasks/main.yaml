@@ -57,6 +57,9 @@
       set_fact:
         ghrr_install: false
       when: sv.stat.exists and svcontent == github_repository_version
+  rescue:
+     - debug:
+         msg: 'continuing installing, version compare failed'
 
 - name: validate required variables
   block:
